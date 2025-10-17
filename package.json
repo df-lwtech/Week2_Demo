@@ -2,4 +2,10 @@
   "dependencies": {
     "express": "^5.1.0"
   }
+  ,"scripts": {
+    "start": "node app.js",
+    "client:dev": "cd client && npm run dev",
+    "client:build": "cd client && npm run build",
+    "client:preview": "cd client && npm run preview"
+  }
 }
