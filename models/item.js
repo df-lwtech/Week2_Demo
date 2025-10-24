@@ -1,13 +1,30 @@
-// Simple in-memory Item model
-// Each item: { id: string, name: string, description: string }
+// Sequelize-backed Item model wrapper
+const { DataTypes } = require('sequelize')
+const { sequelize } = require('./index')
 
-const { randomUUID } = require('crypto')
+// Define the Sequelize model
+const Item = sequelize.define('Item', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: false,
+  },
+}, {
+  tableName: 'items',
+  timestamps: true,
+})
 
-class ItemModel {
-  constructor() {
-    this.items = new Map()
-  }
-
+// Keep an API similar to the previous in-memory model
+module.exports = {
+  // validation remains synchronous (same shape as before)
   validate(item) {
     if (!item) return { valid: false, error: 'Item is required' }
     if (!item.name || typeof item.name !== 'string' || item.name.trim() === '') {
@@ -17,36 +34,37 @@ class ItemModel {
       return { valid: false, error: 'Description is required and must be a string' }
     }
     return { valid: true }
-  }
+  },
 
-  create({ name, description }) {
-    const id = randomUUID()
-    const newItem = { id, name, description }
-    this.items.set(id, newItem)
-    return newItem
-  }
+  // create returns the created item
+  async create({ name, description }) {
+    const created = await Item.create({ name, description })
+    return created.toJSON()
+  },
 
-  list() {
-    return Array.from(this.items.values())
-  }
+  async list() {
+    const rows = await Item.findAll({ order: [['createdAt', 'DESC']] })
+    return rows.map(r => r.toJSON())
+  },
 
-  get(id) {
-    return this.items.get(id) || null
-  }
+  async get(id) {
+    const row = await Item.findByPk(id)
+    return row ? row.toJSON() : null
+  },
 
-  update(id, { name, description }) {
-    const existing = this.items.get(id)
-    if (!existing) return null
-    const updated = { ...existing }
-    if (name !== undefined) updated.name = name
-    if (description !== undefined) updated.description = description
-    this.items.set(id, updated)
-    return updated
-  }
+  async update(id, { name, description }) {
+    const row = await Item.findByPk(id)
+    if (!row) return null
+    if (name !== undefined) row.name = name
+    if (description !== undefined) row.description = description
+    await row.save()
+    return row.toJSON()
+  },
 
-  delete(id) {
-    return this.items.delete(id)
-  }
+  async delete(id) {
+    return !!(await Item.destroy({ where: { id } }))
+  },
+
+  // expose the Sequelize model for advanced use
+  Model: Item,
 }
-
-module.exports = new ItemModel()
